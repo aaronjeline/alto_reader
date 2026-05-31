@@ -1,0 +1,50 @@
+ALTODEFS.D.
+ALTOFILESYS.D.
+ASM. RUN.
+BCA. BR.
+BCA. RUN.
+BCA. TM.
+BCPL. RUN.
+bcol.scratchl.
+BCPLFILES.D.
+Bopl. Scratcho.
+BESTEST. RUN.
+BLDR.RUN.
+Bootfrom.=.
+BootKeys, =
+BRAVO. MESSAGES
+BRAVO. RUN.
+bravo, scratchbin
+bravo, scratchbravo,
+bravo, state.
+bravo.ts.
+COM. Ci.
+Copy.*.
+COPYDISK, RUN.
+Delete.~.
+DIAG
+DIEN. RUN.
+DISKS. D.
+dload. bepl.
+dloadx. bopl.
+DRAR. RUN.
+Dump,.
+EDP. RUN.
+Etherwatch.boot.
+ETHERNATCH.RUN.
+find. run.
+Flash. Run.
+GACHA12. AL.
+F9NEWEM，28
+ARROWS10 AL. oca. syms.
+Bop1. Scratchd. lank. presst
+SRAVU.ERRUR
+Chat，~
+CRTTEST.RUN
+Diskdescriptor.
+DMT. BOOT.
+EtherBoot.-
+Executive. Run.
+FONTS. WIDTHS.
+Filestat. Etp.».
+GATES32.

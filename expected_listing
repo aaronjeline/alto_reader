@@ -1,0 +1,37 @@
+?.                 ALTODEFS.D.        ALTOFILESYS.D.     ARROWS10.AL.
+ASM.RUN.           BCA.BR.            BCA.RUN.           bca.syms.
+BCA.TM.            BCPL.RUN.          Bcpl.Scratchc.     Bcpl.Scratchd.
+Bcpl.Scratchl.     BCPLFILES.D.       BFSTEST.RUN.       blank.press$.
+BLDR.RUN.          Bootfrom.~.        BootKeys.~.        BRAVO.ERROR.
+BRAVO.MESSAGES.    BRAVO.RUN.         bravo.scratchbin.
+bravo.scratchbravo.    bravo.state.    bravo.ts.         Chat.~.
+com.cm.            Copy.~.            COPYDISK.RUN.      CRTTEST.RUN.
+Delete.~.          DIAG.CM.           DIEX.RUN.          DiskDescriptor.
+DISKS.D.           dload.bcpl.        dloadx.bcpl.       DMT.BOOT.
+DRAW.RUN.          Dump.~.            EDP.RUN.           EtherBoot.~.
+EtherWatch.boot.   ETHERWATCH.RUN.    Executive.Run.     FileStat.~.
+find.run.          Flash.Run.         fontmem.b.         FONTS.WIDTHS.    Ftp.~.
+GACHA10.AL.        GACHA12.AL.        Garbage.$.         GATES32.AL.
+hello.bcpl.        hello.BR.          hello.BS.          hello.RUN.
+hello.SYMS.        HELVETICA10.AL.    helvetica10n.al.   HELVETICA12.AL.
+HELVETICA12B.AL.   HELVETICA14.AL.    HELVETICA18.AL.    HELVETICA7.AL.
+helvetica7b.al.    HELVETICA8.AL.     HIPPO10.AL.        Install.~.
+KEYTEST.RUN.       Life64.RUN.        Load.~.            LogIn.~.
+LOGO24.AL.         MADTEST.RUN.       MANUAL1.DRAW.      MARKUP.RUN.
+MATH10.AL.         maze.run.          MesaBanks.~.       NEPTUNE.RUN.
+NetExec.boot.      NetExec.~.         oldfontdir.b.      Partition.~.
+Peek.reports.      Peek.Run.          Petal.Boot.        Pinball.RUN.
+Pool.RUN.          pport.bcpl.        pport.BR.          pport.BT.
+pport.RUN.         pport.SYMS.        PRESSEDIT.RUN.     PupTest.boot.
+puptest.run.       Quit.~.            RAMLOAD.RUN.       Release.~.
+Rem.Cm.            Rename.~.          Resume.~.          rfile.bcp.
+SCAVENGER.RUN.     Scavenger.~.       ScavengerLog.      SetTime.~.
+Sil.fonts.         spacewar.run.      StandardRam.~.     StarWars.RUN.
+STREAMS.D.         Swat.    Swat.erp.    Swatee.         SYS.BK.
+Sys.Boot.          SYS.ERRORS.        SYS.SYMS.          SYSDEFS.D.
+SysDir.            SysFont.Al.        tdisk.bcpl.        tdisk.BR.
+tdisk.BT.          tdisk.RUN.         tdisk.SYMS.        tdisk4.bcpl$.
+tdisk4.bcpl.       tdisk4.BR.         tdisk4.RUN.        tdisk4.SYMS.
+TEMPLATE64.AL.     test.bravo.        TFU.RUN.           TIMESROMAN10.AL.
+TIMESROMAN12.AL.   TIMESROMAN14.AL.   TIMESROMAN8.AL.    Type.~.
+user.cm$.          user.cm.           waves.bcpl.        WriteDirectory.~.

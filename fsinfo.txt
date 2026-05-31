@@ -1,0 +1,131 @@
+This document describes the disk formats used in the Alto File System. It also describes a "disk object," a
+Bcpl software construct that is used to interface low-level disk drivers with packages that implement
+higher-level objects, such as streams.
+The primary focus of the description will be for the "standard" Alto disks: either (1) up to 2 Diablo Model
+31 disk drives or (2) one Diablo Model 44 disk drive. The low-level drivers for these disks are called "Bfs"
+(Basic File System). With minor modifications, the description below applies to the Trident Model T80
+and T300 disk drives, when formatted for Alto file system conventions. The differences are flagged with
+the string [Trident]. Low-level drivers for the Trident disks are called "Tfs."
+1. Distribution
+Relocatable binary files for the BFS are kept in <Alto>BFSBrs.dm. The sources, command files, and test
+program (described later in this document) are kept in <AltoSource>BFSSources.dm Relocatable binary
+files for the TFS are kept in <Alto>TFS.dm; sources are kept on <AltoSource>TFSSources.dm.
+2. File and Disk Structure
+This section describes the conventions of the Alto file system. The files AltoFileSys.D and Bfs.D contain
+Bcpl structure declarations that correspond to this description ([Trident]: See also "Tfs.D").
+The unit of transfer between disk and memory, and hence that of the file system, is the disk sector. Each
+sector has three fields: a 2-word header, an 8-word label, and a 256-word data page. ([TfidentJ: The fields
+are a 2-word header, a 10-word label, and a 1024-word data page.)
+A sector is identified by a disk address; there are two kinds of disk addresses, real and virtual. The
+hardware deals in real addresses, which have a somewhat arbitrary format. An unfortunate consequenceis
+that the real addresses for all the pages on a disk unit are sparse in the set of 16 bit integers. To correct this
+defect, virtual addresses have been introduced. They have the property that the pages of a disk unit which
+holds n pages have virtual addresses 0 (n-1). Furthermore, the ordering of pages by virtual address is
+such that successive pages in the virtual space are usually sequential on the disk. As a result, assigning a
+sequence of pages to consecutive virtual addresses will ensure that they can be read in as fast as possible.
+2.1. Legal Alto Files
+An Alto file is a data structure that contains two sorts of information: some is mandatory, and is required
+for all legal files; the remainder is "hints". Programs that operate on files should endeavor to keep the
+hints accurate, but should never depend on the accuracy of a hint.
+A legal Alto file consists of a sequence of pages held together by a doubly-linked list recorded in the label
+fields. Each label contains the mandatory information:
+The forward and backward links, recorded as real disk addresses.
+A page number which gives the position of the page in the file; pages are numbered from 0.
+A count of the number of characters of data in the page (numchars). This may range from 0 (for a
+Disks & I3fs A u g u s t 10, 1980 5 2
+completely empty page) to 512 (for a completely full page). ([Trident]: A full page contains 2048
+characters.)
+A real file id, which is a three-word unique identifier for the file. The user normally deals with virtual
+file ids (see the discussion of file pointers, below), which are automatically converted into real file ids
+when a label is needed.
+Three bits in the file id deserve special mention:
+Directory: This bit is on if the file is itself a directory file. This information is used by the disk
+Scavenger when trying to re-build a damaged disk data structure.
+Random: This bit is currently unused.
+NoLog: This bit is no longer used, but many existing files are likely to have it set.
+Leader Page: Page 0 of a file is called the leader page; it contains no file data, but only a collection of file
+properties, all of which are hints. The structure LD in AltoFileSys.D declares the format of a leader page,
+which contains the following standard items:
+The file name, a hint so that the Scavenger can enter this file in a directory if it is not already in one.
+The times for creation, last read and last write, interpreted as follows:
+A file's creation date is a stamp generated when the information in the file is created. When a
+file is copied (without modification), the creation date should be copied with it. When a file
+is modified in any way (either in-place or as a result of being overwritten by newly-created
+information), a new creation date should be generated.
+A file's write date is updated whenever that file is physically written on a given file system.
+A file's read date is updated whenever that file is physically read from within a given file
+system.
+A pointer to the directory in which the file is thought to be entered (zeroes imply the system
+directory SysDir).
+A "hint" describing the last page of the file.
+A "consecutive" bit which is a hint that the pages of the file lie at consecutive virtual disk addresses.
+The changeSerial field related to version numbering: whenever a new version of a file "foo" is
+made, the changeSerial field of all other files "foo" (i.e., older versions) is incremented. Thus, a
+program that wishes to be sure that it is using the most recent version of a file can verify that
+changeSerial = 0. I f a program keeps an FP as a hint for a file, and is concerned about the relative
+position of that file in the list of version numbers, it can also keep and verify the changeSerial entry
+of the file. Version numbers have been deimplemented.
+These standard items use up about 40 words of the leader page. The remaining space is available for
+storing other information iri blocks which start with a one word header containing type and length fields.
+A zero terminates the list. The structure FPROP in AltoFileSys.d defines the header format. The only
+standard use of this facility is to record the logical shape of the disk in the leader page of SysDir.
+Data: The first data byte of a file is the first byte of page 1.
+In a legal file with n pages, the label field of page i must contain:
+A next link with the real disk address of page (i + 1), or 0 if i = n-1.
+A previous link with the real disk address of page (i-1), or 0 if i = O.
+Disks & Bfs A u g u s t 10, 1980 5 3
+A page number between 0 and (n-1), inclusive.
+A numchars word = 512 if i<n-1, and <512 if i =n 1. The last page must not be completely full.
+(ridden* = 2048 if i<n-1, and <2048 if i = n-1.)
+A real file id which is the same for every page in the file, and different from the real file id of any other
+file on the disk.
+A file is addressed by an object called a file pointer (FP), which is declared in AltoFileSys.D. A filepointer
+contains a virtual file id, and also the virtual address of the leader page of the file. The low-level disk
+routines construct a real file id from the virtual one when they must deal with a disk label. Since it is
+possible for the user to read a label from the disk and examine its contents, the drivers also provides a
+routine which will convert the real file id in the label into a file pointer (of course, the leader address will
+not be filled in).
+Note: Real disk address 0 (equal virtual disk address 0) cannot be part of any legal Alto file because the
+value 0 is reserved to terminate the forward and backward chains in sector labels. However, disk address0
+is used for "booting" the Alto: when the boot key is pressed when no keyboard keys are down, sector Ois
+read in as a bootstrap loader. The normal way to make a file the "boot file" is to first create a legal Alto file
+with the bootstrap loader as the first data page (page 1), and then to copy this page (label and data) into
+disk sector 0. Thus the label in sector 0 points forward to the remainder of the boot file.
+2.2. Legal Alto Disks
+A legal disk is one on which every page is either part of a legal file, or free, or "permanently bad." A free
+page has a file id of all ones, and the rest of its label is indeterminate. A permanently bad page has a file id
+with each of the three words set to -2, and the remainder of the label indeterminate.
+2.3. Alto Directory Files
+A directory is a file for associating string names and FP's. It has the directory bit set in its file id, and has
+the following format (structure DV declared in AltoFileSys.D).
+It is a sequence of entries. An entry contains a header and a body. The length field of the header tells how
+many words there arc in the entry, including the header. The interpretation of the body depends on the
+type, recorded in the header.
+dvTypeFrce= 0: free entry. The body is uninterpreted.
+dvTypeFile =1: file entry. The body consists of a file pointer, followed by a Bcpl string containing the
+name of the file. The file name must contain only upper and lower case letters, digits, and characters
+in the string "+-.!$". They must terminate with a .period (".") and not be longer than maxLengthFn
+characters. I f there are an odd number of bytes in the name, the "garbage byte" must be O. The
+interpretation of exclamation mark (!) is special; if a file name ends with ! followed only by digits (and
+the mandatory "."), the digits specify a file version number.
+The main directory is a file with its leader page stored in the disk page with virtual address 1. There isan
+entry for the main directory in the main directory, with the name SysDir. All other directories can be
+reached by starting at the main directory.
+2.4. Disk Descriptor
+There is a file called DiskDescriptor entered in the main directory which contains a disk descriptor
+structure which describes the disk and tells which pages are free. The disk descriptor has two parts: a 16
+word header which describes the shape of the disk, and a bit table indexed by virtual disk address. The
+declaration of the header structure is in AltoFileSys.D.
+Disks & 13fs A u g u s t 10, 1980 5 4
+The "defaultVersionsKept" entry in the DiskDescriptor records the number of old versions of files that
+should be retained by the system. I f this entry is 0, no version accounting is done: new files simply replace
+old ones. Version numbers have been deimplemented.
+The entry in the disk descriptor named "freePages" is used to maintain a count of free pages on the disk.
+This is a hint about a hint: it is computed when a disk is opened by counting the bits in the bit table, and
+then incrementing and decrementing as pages arc released and allocated. However the hit table is itself
+just a collection of hints, as explained below.
+The bit table contains a "1" corresponding to each virtual disk address that is believed to be occupied bya
+file, and "0" for free addresses. These values are, however, only hints. Programs that assign new pages
+should check to be sure that a page thought to be free is indeed so by reading the label and checking tosee
+that it describes a free page. (The WriteDiskPages and CreateDiskFile procedures in the disk object
+perform this checking for you.
