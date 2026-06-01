@@ -1,4 +1,4 @@
 (executable
  (public_name alto_reader)
  (name main)
- (libraries alto_reader))
+ (libraries alto_reader core core_unix core_unix.filename_unix))

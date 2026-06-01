@@ -1,14 +1,48 @@
 open Core
 open Alto_reader
 
-let path = "./tdisk4.dsk"
+let disk_path = "./tdisk4.dsk"
 
-let () = 
-    let disk = Disk.Disk.of_file path in
-    Disk.Disk.all_sectors disk
-    |> Sequence.iteri ~f:(fun i sector -> 
-            let label = Disk.Sector.label sector in
-            let (~hex, ~chars)  = Disk.hexdump_words label in
-            Printf.printf "%d: %s|%s\n" i hex chars
-    )
+let editor () =
+    match Sys.getenv "EDITOR" with
+    | Some e when not (String.is_empty e) -> e
+    | _ -> "vim"
 
+let cmd_ls () =
+    let disk = Disk.Disk.of_file disk_path in
+    Disk.Listing.list_files disk |> List.iter ~f:print_endline
+
+let cmd_edit name =
+    let disk = Disk.Disk.of_file disk_path in
+    match Disk.Listing.find_entry disk ~name with
+    | None ->
+        eprintf "no such file: %s\n" name;
+        exit 1
+    | Some entry ->
+        let data = Disk.File.read disk ~leader_vda:entry.leader_vda in
+        let tmp = Filename_unix.temp_file "alto_edit_" "" in
+        Out_channel.write_all tmp ~data:(Bytes.to_string data);
+        let cmd = Printf.sprintf "%s %s" (editor ()) (Filename.quote tmp) in
+        let rc = Sys_unix.command cmd in
+        if rc <> 0 then begin
+            eprintf "editor exited with status %d; not writing back\n" rc;
+            Core_unix.unlink tmp;
+            exit rc
+        end;
+        let new_data = In_channel.read_all tmp |> Bytes.of_string in
+        Core_unix.unlink tmp;
+        Disk.File.write disk ~leader_vda:entry.leader_vda new_data;
+        printf "wrote %d bytes back to %s\n" (Bytes.length new_data) name
+
+let usage () =
+    eprintf
+      "usage:\n\
+       \  alto_reader ls           list files in SysDir\n\
+       \  alto_reader edit NAME    open NAME in $EDITOR and write back on save\n";
+    exit 2
+
+let () =
+    match Array.to_list (Sys.get_argv ()) with
+    | _ :: ("ls" :: []) | [_]           -> cmd_ls ()
+    | _ :: ("edit" :: [name])           -> cmd_edit name
+    | _                                 -> usage ()

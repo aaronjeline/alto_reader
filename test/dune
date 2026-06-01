@@ -1,3 +1,7 @@
-(test
- (name test_alto_reader)
- (libraries alto_reader))
+(library
+ (name alto_reader_tests)
+ (inline_tests
+  (deps ../tdisk4.dsk))
+ (preprocess
+  (pps ppx_jane))
+ (libraries alto_reader core core_unix core_unix.filename_unix))
