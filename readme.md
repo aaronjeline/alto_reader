@@ -15,12 +15,9 @@ dune test          # inline test suite (depends on tdisk4.dsk)
 
 ## CLI
 
-The executable operates on `./tdisk4.dsk` in the current working directory.
-
 ```sh
-alto_reader                       # list files in SysDir (same as `ls`)
-alto_reader ls
-alto_reader edit NAME             # open NAME in $EDITOR (default: vim)
+alto_reader ls DISK               # list files in SysDir
+alto_reader edit DISK NAME        # open NAME in $EDITOR (default: vim)
                                   # and write the result back to the disk
 ```
 

@@ -1,8 +1,6 @@
 open Core
 open Alto_reader
 
-let disk_path = "./tdisk4.dsk"
-
 let editor () =
     match Sys.getenv "EDITOR" with
     | Some e when not (String.is_empty e) -> e
@@ -11,14 +9,18 @@ let editor () =
 let cmd_ls =
     Command.basic
       ~summary:"list files in SysDir"
-      (Command.Param.return (fun () ->
+      (let%map_open.Command disk_path = Command.Param.anon ("DISK" %: Command.Param.string) in
+       fun () ->
            let disk = Disk.of_file disk_path in
-           Listing.list_files disk |> Iarray.iter ~f:print_endline))
+           Listing.list_files disk |> Iarray.iter ~f:print_endline)
 
 let cmd_edit =
     Command.basic
       ~summary:"open NAME in $EDITOR and write back on save"
-      (let%map_open.Command name = Command.Param.anon ("NAME" %: Command.Param.string) in
+      (let%map_open.Command
+           disk_path = Command.Param.anon ("DISK" %: Command.Param.string)
+       and name     = Command.Param.anon ("NAME" %: Command.Param.string)
+       in
        fun () ->
            let disk = Disk.of_file disk_path in
            match Listing.find_file disk ~name with
