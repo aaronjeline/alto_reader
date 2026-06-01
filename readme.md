@@ -42,7 +42,7 @@ All modules live in the `Alto_reader` library (`lib/`):
 | `Disk` | Memory-maps a `.dsk` file; `Sector`, `Label`, and `Fid` sub-modules |
 | `Hex` | `hexdump_words` — formats a `Bigstring` as hex words + printable chars |
 | `Bcpl_string` | Decodes a BCPL length-prefixed, byte-swapped string |
-| `Listing` | Walks SysDir by following the next-pointer chain |
+| `Listing` | Walks SysDir listing the contents |
 | `File` | Reads and rewrites the contents of a named file |
 
 ### Key APIs
