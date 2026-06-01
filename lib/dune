@@ -1,5 +1,5 @@
 (library
  (name alto_reader)
  (preprocess (pps ppx_jane))
- (modules disk)
+ (modules disk words hex bcpl_string listing file)
  (libraries core core_unix core_unix.bigstring_unix vec))

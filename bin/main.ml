@@ -9,17 +9,17 @@ let editor () =
     | _ -> "vim"
 
 let cmd_ls () =
-    let disk = Disk.Disk.of_file disk_path in
-    Disk.Listing.list_files disk |> List.iter ~f:print_endline
+    let disk = Disk.of_file disk_path in
+    Listing.list_files disk |> List.iter ~f:print_endline
 
 let cmd_edit name =
-    let disk = Disk.Disk.of_file disk_path in
-    match Disk.Listing.find_entry disk ~name with
+    let disk = Disk.of_file disk_path in
+    match Listing.find_file disk ~name with
     | None ->
         eprintf "no such file: %s\n" name;
         exit 1
-    | Some entry ->
-        let data = Disk.File.read disk ~leader_vda:entry.leader_vda in
+    | Some file ->
+        let data = File.read disk file in
         let tmp = Filename_unix.temp_file "alto_edit_" "" in
         Out_channel.write_all tmp ~data:(Bytes.to_string data);
         let cmd = Printf.sprintf "%s %s" (editor ()) (Filename.quote tmp) in
@@ -31,7 +31,7 @@ let cmd_edit name =
         end;
         let new_data = In_channel.read_all tmp |> Bytes.of_string in
         Core_unix.unlink tmp;
-        Disk.File.write disk ~leader_vda:entry.leader_vda new_data;
+        File.write disk file new_data;
         printf "wrote %d bytes back to %s\n" (Bytes.length new_data) name
 
 let usage () =
