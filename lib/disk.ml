@@ -157,10 +157,13 @@ let of_file filename =
     let len = Int64.to_int_exn stat.st_size in
     Bigstring_unix.map_file ~shared:true f len
 
-let n_sectors disk = disk.len / Sector.sector_size
+let len disk = 
+    Bigstring.length disk
+
+let n_sectors disk = len disk / Sector.sector_size
 
 let get_sector disk sector_num =
-    Sector.create disk.buf ~pos:(sector_num * Sector.sector_size)
+    Sector.create disk ~pos:(sector_num * Sector.sector_size)
 
 let all_sectors disk =
     Sequence.range 0 (n_sectors disk)
