@@ -147,10 +147,7 @@ end
 
 
 (** Memory containing a disk image **)
-type t = {
-    buf : Bigstring.t;
-    len : int
-}
+type t = Bigstring.t
 [@@deriving sexp]
 
 (** reads a disk image from a file **)
@@ -158,8 +155,7 @@ let of_file filename =
     let f = Unix.openfile filename ~mode:[Unix.O_RDWR] in
     let stat = Unix.fstat f in
     let len = Int64.to_int_exn stat.st_size in
-    let buf = Bigstring_unix.map_file ~shared:true f len in
-    { len; buf }
+    Bigstring_unix.map_file ~shared:true f len
 
 let n_sectors disk = disk.len / Sector.sector_size
 

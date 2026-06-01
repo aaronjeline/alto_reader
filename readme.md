@@ -1,6 +1,6 @@
 # alto_reader
 
-An OxCaml library and CLI for reading and editing files inside a Xerox Alto
+An OCaml library and CLI for reading and editing files inside a Xerox Alto
 disk image (`.dsk`).
 
 The on-disk format — sector layout, label fields, BCPL byte packing, and the
@@ -18,10 +18,10 @@ dune test          # inline test suite (depends on tdisk4.dsk)
 The executable operates on `./tdisk4.dsk` in the current working directory.
 
 ```sh
-dune exec bin/main.exe              # list files in SysDir (same as `ls`)
-dune exec bin/main.exe ls
-dune exec bin/main.exe edit NAME    # open NAME in $EDITOR (default: vim)
-                                    # and write the result back to the disk
+alto_reader                       # list files in SysDir (same as `ls`)
+alto_reader ls
+alto_reader edit NAME             # open NAME in $EDITOR (default: vim)
+                                  # and write the result back to the disk
 ```
 
 The Alto filename grammar matters — names usually end with a `.`
@@ -30,34 +30,44 @@ shared `mmap`, so changes persist immediately on a successful editor exit.
 If the editor exits non-zero, the file is left untouched.
 
 > **Heads up:** `edit` mutates the disk image in place. Work on a copy
-> (`cp tdisk4.dsk /tmp/scratch.dsk && cd /tmp && main.exe edit ...`) unless
-> you know what you're doing.
+> (`cp tdisk4.dsk /tmp/scratch.dsk`) unless you know what you're doing.
 
-## Library
+## Library layout
 
-The `Alto_reader.Disk` module exposes:
+All modules live in the `Alto_reader` library (`lib/`):
 
-- `Disk.of_file` / `Disk.get_sector` / `Disk.all_sectors` — low-level
-  sector access via a memory-mapped `Bigstring`.
-- `Sector.header` / `Sector.label` / `Sector.data` / `Sector.real_disk_address`
-  — slice a sector into its three on-disk regions.
-- `Label.next` / `prev` / `nbytes` / `page_number` / `fid` (plus matching
-  setters) — typed read/write of the 8-word label.
-- `Bcpl_string.read` — decode a BCPL-packed length-prefixed string.
-- `Listing.list_files` / `Listing.find_entry` / `Listing.entries` — walk
-  SysDir.
-- `File.read` / `File.write` — read or rewrite the contents of a single
-  file by leader virtual disk address. `write` reuses existing pages,
-  allocates from the free list when growing, and releases unused pages
-  when shrinking. Byte order is unswapped/re-swapped so file contents
-  come out as natural bytes (the Alto packs two bytes per word with the
-  first byte in the high half).
+| Module | Purpose |
+|---|---|
+| `Words` | Word-level I/O (`read_word`/`write_word`) and byte-offset constants |
+| `Disk` | Memory-maps a `.dsk` file; `Sector`, `Label`, and `Fid` sub-modules |
+| `Hex` | `hexdump_words` — formats a `Bigstring` as hex words + printable chars |
+| `Bcpl_string` | Decodes a BCPL length-prefixed, byte-swapped string |
+| `Listing` | Walks SysDir by following the next-pointer chain |
+| `File` | Reads and rewrites the contents of a named file |
+
+### Key APIs
+
+**`Disk`**
+- `Disk.of_file` / `get_sector` / `all_sectors` — low-level sector access via a shared `mmap`.
+- `Sector.header` / `label` / `data` / `real_disk_address` — slice a sector into its three regions.
+- `Label.next` / `prev` / `nbytes` / `page_number` / `fid` and matching setters — typed read/write of the 8-word label.
+
+**`Listing`**
+- `Listing.list_files` — returns the names of all files in SysDir.
+- `Listing.find_file` — looks up a `File.t` by name.
+- `Listing.files` — returns all `File.t` records.
+
+**`File`**
+- `File.read disk file` — reads and unswaps the bytes of a file into a `Bytes.t`.
+- `File.write disk file data` — writes data back, reusing existing pages,
+  allocating from the free list when growing, and releasing pages when shrinking.
+  Applies the same byte-pair swap as `read` so round-trips are transparent.
 
 ## Capabilities and limits
 
 - Only `SysDir` is searched; nested directories are not traversed.
 - The free-page allocator looks for sectors whose label `fid` reads as
   `Fid.free` but does not update the `DiskDescriptor` bit table. Per the
-  fsinfo spec the bit table is a hint, and well-behaved Alto programs
-  verify free status by reading the label anyway.
+  fsinfo spec the bit table is a hint, and well-behaved Alto programs verify
+  free status by reading the label anyway.
 - No checksums are written for the on-disk header/label/data fields.
