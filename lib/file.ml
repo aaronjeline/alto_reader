@@ -13,6 +13,7 @@ let fid disk file =
     |> Disk.Sector.label
     |> Disk.Label.fid
 
+(** Is this a data page that belongs to the given fid? **)
 let is_data_page file_fid sector = 
     let label = Disk.Sector.label sector in
     if Disk.Fid.equal (Disk.Label.fid label) file_fid
@@ -21,7 +22,7 @@ let is_data_page file_fid sector =
     else
         None
 
-(* All data pages of the file (page_number > 0), sorted ascending. *)
+(** All data pages of the file (page_number > 0), sorted ascending. **)
 let data_pages disk file =
     let file_fid = fid disk file in
     Disk.all_sectors disk
@@ -29,6 +30,30 @@ let data_pages disk file =
     |> Sequence.to_list
     |> List.sort 
         ~compare:(fun (~pageno:a, _) (~pageno:b, _) -> Int.compare a b)
+
+(** read the raw bytes of a disk file **)        
+let concat_data_pages disk file  =
+    let pages = data_pages disk file in
+    let bytes_in_sector sector = 
+            sector 
+            |> Disk.Sector.label 
+            |> Disk.Label.nbytes in
+    let total = 
+        List.sum 
+            (module Int) 
+            ~f:(fun (~pageno, s) -> bytes_in_sector s)
+            pages in
+    let out = Bigstring.create total in
+    let pos = ref 0 in
+    List.iter pages ~f:(fun (~pageno, s) ->
+        Bigstring.blit 
+            ~src:(Disk.Sector.data s)
+            ~src_pos:0 
+            ~dst:out 
+            ~dst_pos:!pos 
+            ~len:(bytes_in_sector s);
+        pos := !pos + (bytes_in_sector s));
+    out
 
 (* Bytes in the on-disk data area are stored swapped within each word
    pair: file byte 0 = low byte of word 0, file byte 1 = high byte, etc.
