@@ -87,18 +87,20 @@ let pages_needed size =
 
 (* Find a sector whose label says it's free. Skips sector 0 (boot) and
    sector 1 (SysDir leader). *)
-let find_free_sector disk ~exclude =
+let find_free_sector disk start =
     let n = Disk.n_sectors disk in
-    let excluded = Set.of_list (module Int) exclude in
+    (*let excluded = Set.of_list (module Int) exclude in*)
     let rec loop i =
-        if i >= n then failwith "no free sectors on disk"
-        else if Set.mem excluded i then loop (i + 1)
+        if i >= n then 
+            failwith "no free sectors on disk"
         else
             let sector = Disk.get_sector disk i in
-            if Disk.Label.is_free (Disk.Sector.label sector) then (i, sector)
-            else loop (i + 1)
+            if Disk.Label.is_free (Disk.Sector.label sector) then 
+                (i, sector)
+            else 
+                loop (i + 1)
     in
-    loop 2
+    loop start
 
 let write disk file new_data =
     let new_size = Bytes.length new_data in
@@ -106,35 +108,37 @@ let write disk file new_data =
     let n_existing = List.length existing in
     let n_needed = pages_needed new_size in
     let file_fid = fid disk file in
+    (* Phase 1: build up our in memory list of pages *)
     (* Build the final list of pages used. Reuse existing pages first,
        then allocate from free list if we need more. *)
     let pages =
         if n_needed <= n_existing then
             List.take existing n_needed
         else begin
-            let extras = ref [] in
-            (* Don't pick a sector that's already one of [existing] — the
-               labels won't read as "free" once we start filling earlier
-               pages, but it's clearer to exclude them upfront. *)
-            let excluded = ref [] in
+            let extras = Vec.create () in
+            (* we start at sector 2: 
+                sector 0 is the boot sector
+                sector 1 is sys_dir  *)
+            let start = ref 2 in
             for page_num = n_existing + 1 to n_needed do
                 let (v, sector) =
-                    find_free_sector disk ~exclude:!excluded
+                    find_free_sector disk !start
                 in
-                excluded := v :: !excluded;
+                start := v + 1; (* start our search at the next sector *)
                 (* Claim the page: set fid + page number so it stops
                    reading as free for subsequent allocations. *)
                 let label = Disk.Sector.label sector in
                 Disk.Label.set_fid label file_fid;
                 Disk.Label.set_page_number label page_num;
                 Disk.Label.set_blank label 0;
-                extras := (~pageno:page_num, sector) :: !extras
+                (* Push the page onto our vec of new pages *)
+                Vec.push_back extras (~pageno:page_num, sector)
             done;
-            existing @ List.rev !extras
+            existing @ (Vec.to_list extras)
         end
     in
     let n_pages = List.length pages in
-    (* Copy data into the pages, set per-page nbytes. *)
+    (* Phase 2: Copy data into the pages, set per-page nbytes. *)
     let pos = ref 0 in
     List.iteri pages ~f:(fun idx (~pageno, sector) ->
         let label = Disk.Sector.label sector in
@@ -151,7 +155,7 @@ let write disk file new_data =
         if nb land 1 = 1 then Bigstring.set data (nb - 1) '\x00';
         Disk.Label.set_nbytes label nb;
         pos := !pos + nb);
-    (* Fix up the doubly-linked next/prev chain. The leader page links to
+    (* Phase 3: Fix up the doubly-linked next/prev chain. The leader page links to
        page 1 (which we don't touch here); each data page's prev points to
        the previous data page (or the leader for page 1), and next points
        to the next data page (or 0 for the last). *)
@@ -169,7 +173,7 @@ let write disk file new_data =
         in
         Disk.Label.set_prev label prev_da;
         Disk.Label.set_next label next_da);
-    (* Release any pages no longer needed. *)
+    (* Phase 4: Release any pages no longer needed. *)
     if n_existing > n_needed then begin
         let to_free = List.drop existing n_needed in
         List.iter to_free ~f:(fun (~pageno, sector) ->
