@@ -1,5 +1,6 @@
 open Core
 open Words
+open Units
 
 (** 
     Library for listing the files in a file system
@@ -7,7 +8,7 @@ open Words
 
 let sys_dir_file : File.t = {
     name = "";
-    leader_vda = 1
+    leader_vda = VirtAddr.of_int 1
 }
 
 
@@ -28,6 +29,7 @@ let parse_entries buf =
                     read_word buf
                         ~pos:((!i + Disk.Dv_entry.leader_vda_word_offset)
                               * bytes_per_word)
+                     |> VirtAddr.of_int 
                 in
                 let name =
                     Bcpl_string.read buf

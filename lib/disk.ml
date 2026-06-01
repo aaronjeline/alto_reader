@@ -1,6 +1,7 @@
 open Core
 open Words
 module Unix = Core_unix
+open Units
 
 (**
    A Xerox Alto Diablo Disk file system library
@@ -36,6 +37,8 @@ module Fid = struct
     let bad  = (~flag:0xFFFE, ~serial:0xFFFE, ~version:0xFFFE)
 end
 
+
+
 module Label : sig
     (** Labels are the main source of metadata in a sector 
         **)
@@ -48,14 +51,14 @@ module Label : sig
     val of_bigstring : Bigstring.t -> t
 
     (** Physical address of next sector in this file **)
-    val next        : t -> int
+    val next        : t -> PhysAddr.t option
     (** Physical address of previous sector in this file **)
-    val prev        : t -> int
+    val prev        : t -> PhysAddr.t option
     val blank       : t -> int
     (** Used number of bytes in this file **)
     val nbytes      : t -> int
     (** What page in the file is this ? **)
-    val page_number : t -> int
+    val page_number : t -> PageNo.t
     (** File id **)
     val fid         : t -> Fid.t
 
@@ -63,11 +66,11 @@ module Label : sig
     val is_bad  : t -> bool
     val is_data_page : t -> bool
 
-    val set_next        : t -> int -> unit
-    val set_prev        : t -> int -> unit
+    val set_next        : t -> PhysAddr.t option -> unit
+    val set_prev        : t -> PhysAddr.t option -> unit
     val set_blank       : t -> int -> unit
     val set_nbytes      : t -> int -> unit
-    val set_page_number : t -> int -> unit
+    val set_page_number : t -> PageNo.t -> unit
     val set_fid         : t -> Fid.t -> unit
 end = struct
     type t = Bigstring.t
@@ -79,24 +82,42 @@ end = struct
     let word_at     t i   = read_word  t ~pos:(i * bytes_per_word)
     let set_word_at t i v = write_word t ~pos:(i * bytes_per_word) v
 
-    let next        t = word_at t 0
-    let prev        t = word_at t 1
+    let next t = 
+        match word_at t 0 with
+        | 0 -> None
+        | addr -> Some (PhysAddr.of_int addr)
+
+    let prev t = 
+        match word_at t 1 with
+        | 0 -> None
+        | addr -> Some (PhysAddr.of_int addr)
+
     let blank       t = word_at t 2
     let nbytes      t = word_at t 3
-    let page_number t = word_at t 4
+    let page_number t = PageNo.of_int @@ word_at t 4
     let fid         t = (~flag:(word_at t 5), 
                         ~serial:(word_at t 6), 
                         ~version:(word_at t 7))
 
     let is_free t = Fid.equal (fid t) Fid.free
     let is_bad  t = Fid.equal (fid t) Fid.bad
-    let is_data_page t = page_number t <> 0
+    let is_data_page t = t |> page_number |> PageNo.is_data_page
 
-    let set_next        t v = set_word_at t 0 v
-    let set_prev        t v = set_word_at t 1 v
+    let set_next t v = 
+        let open Option in
+        map v ~f:PhysAddr.to_int 
+        |> Option.value ~default:0
+        |> set_word_at t 0
+
+    let set_prev t v = 
+        let open Option in
+        map v ~f:PhysAddr.to_int 
+        |> Option.value ~default:0
+        |> set_word_at t 1
+
     let set_blank       t v = set_word_at t 2 v
     let set_nbytes      t v = set_word_at t 3 v
-    let set_page_number t v = set_word_at t 4 v
+    let set_page_number t v = set_word_at t 4 (PageNo.to_int v)
     let set_fid t (~flag, ~serial, ~version) =
         set_word_at t 5 flag;
         set_word_at t 6 serial;
@@ -120,7 +141,7 @@ module Sector : sig
     val header            : t -> Bigstring.t
     val label             : t -> Label.t
     val data              : t -> Bigstring.t
-    val real_disk_address : t -> int
+    val real_disk_address : t -> PhysAddr.t
 end = struct
     type t = Bigstring.t
 
@@ -142,13 +163,13 @@ end = struct
         Bigstring.sub_shared ~pos:data_byte_offset
                              ~len:(data_words * bytes_per_word) buf
 
-    let real_disk_address buf = read_word buf ~pos:real_da_byte_offset
+    let real_disk_address buf = 
+        PhysAddr.of_int @@ read_word buf ~pos:real_da_byte_offset
 end
 
 
 (** Memory containing a disk image **)
 type t = Bigstring.t
-[@@deriving sexp]
 
 (** reads a disk image from a file **)
 let of_file filename =
@@ -162,11 +183,15 @@ let len disk =
 
 let n_sectors disk = len disk / Sector.sector_size
 
-let get_sector disk sector_num =
-    Sector.create disk ~pos:(sector_num * Sector.sector_size)
+let get_sector disk vaddr =
+    Sector.create disk ~pos:((VirtAddr.to_int vaddr) * Sector.sector_size)
+
+let virtual_address_range disk = 
+    Sequence.range 0 (n_sectors disk)
+    |> Sequence.map ~f:(VirtAddr.of_int)
 
 let all_sectors disk =
-    Sequence.range 0 (n_sectors disk)
+    virtual_address_range disk
     |> Sequence.map ~f:(get_sector disk)
 
 
@@ -185,5 +210,3 @@ module Dv_entry = struct
     let leader_vda_word_offset = 5
     let name_word_offset = 6
 end
-
-

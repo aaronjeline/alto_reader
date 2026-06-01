@@ -1,10 +1,12 @@
 open Core
 open Words 
+open Units
 
 (** A file reference 
     Gives you the virtual address of a the first page in a file
  **)
-type t = { name : string; leader_vda : int } [@@deriving sexp]
+type t = { name : string; leader_vda : VirtAddr.t } 
+    [@@deriving sexp]
 
 let leader_sector disk file = Disk.get_sector disk file.leader_vda
 
@@ -29,7 +31,7 @@ let data_pages disk file =
     |> Sequence.filter_map  ~f:(is_data_page file_fid)
     |> Sequence.to_list
     |> List.sort 
-        ~compare:(fun (~pageno:a, _) (~pageno:b, _) -> Int.compare a b)
+        ~compare:(fun (~pageno:a, _) (~pageno:b, _) -> PageNo.compare a b)
 
 (** read the raw bytes of a disk file **)        
 let concat_data_pages disk file  =
@@ -85,22 +87,25 @@ let pages_needed size =
     if size = 0 then 1
     else (size / bytes_per_data_page) + 1
 
+let rec find_leftover lst ~eq ~exn = 
+    match lst with 
+    | [] -> exn ()
+    | head::tl ->
+            match eq head with
+            | Some v -> (v, tl)
+            | None -> find_leftover tl ~eq ~exn
+
 (* Find a sector whose label says it's free. Skips sector 0 (boot) and
    sector 1 (SysDir leader). *)
-let find_free_sector disk start =
-    let n = Disk.n_sectors disk in
-    (*let excluded = Set.of_list (module Int) exclude in*)
-    let rec loop i =
-        if i >= n then 
-            failwith "no free sectors on disk"
-        else
-            let sector = Disk.get_sector disk i in
-            if Disk.Label.is_free (Disk.Sector.label sector) then 
-                (i, sector)
-            else 
-                loop (i + 1)
+let find_free_sector disk vaddr_space =
+    let eq vaddr = 
+        let sector = Disk.get_sector disk vaddr in
+        if sector |> Disk.Sector.label |> Disk.Label.is_free then
+            Some (vaddr, sector)
+        else 
+            None
     in
-    loop start
+    find_leftover vaddr_space  ~eq ~exn:(fun () -> failwith "No free sectors")
 
 let write disk file new_data =
     let new_size = Bytes.length new_data in
@@ -116,23 +121,26 @@ let write disk file new_data =
             List.take existing n_needed
         else begin
             let extras = Vec.create () in
-            (* we start at sector 2: 
-                sector 0 is the boot sector
-                sector 1 is sys_dir  *)
-            let start = ref 2 in
-            for page_num = n_existing + 1 to n_needed do
-                let (v, sector) =
-                    find_free_sector disk !start
+            (* we skip the first two sectors 
+               the boot sector, and the sys_dir sector *)
+            let vaddr_space =  ref (
+                Disk.virtual_address_range disk
+                |> (fun x -> Sequence.drop x 2)
+                |> Sequence.to_list) in
+            for pageno = n_existing + 1 to n_needed do
+                let pageno = PageNo.of_int pageno in
+                let ((v, sector), remaining) =
+                    find_free_sector disk !vaddr_space
                 in
-                start := v + 1; (* start our search at the next sector *)
+                vaddr_space := remaining;
                 (* Claim the page: set fid + page number so it stops
                    reading as free for subsequent allocations. *)
                 let label = Disk.Sector.label sector in
                 Disk.Label.set_fid label file_fid;
-                Disk.Label.set_page_number label page_num;
+                Disk.Label.set_page_number label pageno;
                 Disk.Label.set_blank label 0;
                 (* Push the page onto our vec of new pages *)
-                Vec.push_back extras (~pageno:page_num, sector)
+                Vec.push_back extras (~pageno, sector)
             done;
             existing @ (Vec.to_list extras)
         end
@@ -164,12 +172,12 @@ let write disk file new_data =
     List.iteri pages ~f:(fun idx (~pageno, sector) ->
         let label = Disk.Sector.label sector in
         let prev_da =
-            if idx = 0 then leader_da
-            else real_of (List.nth_exn pages (idx - 1))
+            if idx = 0 then Some leader_da
+            else Some (real_of (List.nth_exn pages (idx - 1)))
         in
         let next_da =
-            if idx = n_pages - 1 then 0
-            else real_of (List.nth_exn pages (idx + 1))
+            if idx = n_pages - 1 then None
+            else Some (real_of (List.nth_exn pages (idx + 1)))
         in
         Disk.Label.set_prev label prev_da;
         Disk.Label.set_next label next_da);
@@ -180,7 +188,7 @@ let write disk file new_data =
             let label = Disk.Sector.label sector in
             Disk.Label.set_fid label Disk.Fid.free;
             Disk.Label.set_nbytes label 0;
-            Disk.Label.set_next label 0;
-            Disk.Label.set_prev label 0;
-            Disk.Label.set_page_number label 0)
+            Disk.Label.set_next label None;
+            Disk.Label.set_prev label None;
+            Disk.Label.set_page_number label (PageNo.of_int 0))
     end
