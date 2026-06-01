@@ -10,7 +10,7 @@ let editor () =
 
 let cmd_ls () =
     let disk = Disk.of_file disk_path in
-    Listing.list_files disk |> List.iter ~f:print_endline
+    Listing.list_files disk |> Iarray.iter ~f:print_endline
 
 let cmd_edit name =
     let disk = Disk.of_file disk_path in

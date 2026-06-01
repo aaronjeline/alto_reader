@@ -14,8 +14,7 @@ let sys_dir_file : File.t = {
 (** parse the contents of a directory **)
 let parse_entries buf =
     let n_words = Bigstring.length buf / bytes_per_word in
-    (* TODO: replace this with a vector *)
-    let out = ref [] in
+    let out = Vec.create () in
     let i = ref 0 in
     let stop = ref false in
     while not !stop && !i < n_words do
@@ -35,21 +34,22 @@ let parse_entries buf =
                         ~word_offset:(!i + Disk.Dv_entry.name_word_offset)
                 in
                 let f : File.t = { name; leader_vda } in
-                out := f :: !out
+                Vec.push_back out f;
             end;
             i := !i + length
         end
     done;
-    List.rev !out
+    Vec.to_iarray out
 
 (**
     Traverse all the file entries in the root dir of the disk
 **)
 let files disk =
+    (* Get the data entries in the directory, then parse it *)
     File.concat_data_pages disk sys_dir_file
     |> parse_entries
 
-let list_files disk = files disk |> List.map ~f:(fun f -> f.name)
+let list_files disk = files disk |> Iarray.map ~f:(fun f -> f.name)
 
 let find_file disk ~name =
-    files disk |> List.find ~f:(fun f -> String.equal f.name name)
+    files disk |> Iarray.find ~f:(fun f -> String.equal f.name name)

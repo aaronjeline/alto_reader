@@ -1,6 +1,6 @@
 # alto_reader
 
-An OCaml library and CLI for reading and editing files inside a Xerox Alto
+An OxCaml library and CLI for reading and editing files inside a Xerox Alto
 disk image (`.dsk`).
 
 The on-disk format — sector layout, label fields, BCPL byte packing, and the
